@@ -1,0 +1,39 @@
+apiVersion: operator.open-cluster-management.io/v1
+kind: MultiClusterHub
+metadata:
+  creationTimestamp: "2024-05-16T10:23:56Z"
+  finalizers:
+  - finalizer.operator.open-cluster-management.io
+  generation: 2
+  name: multiclusterhub
+  namespace: open-cluster-management
+  resourceVersion: "39944911"
+  uid: a4732e17-ae81-4d9d-ba9d-338e18c6aa47
+spec:
+  availabilityConfig: High
+  enableClusterBackup: false
+  ingress: {}
+  overrides:
+    components:
+    - enabled: true
+      name: app-lifecycle
+    - enabled: true
+      name: cluster-lifecycle
+    - enabled: true
+      name: cluster-permission
+    - enabled: true
+      name: event-exporter
+    - ...
+  status:
+    components:
+      cluster-permission:
+        lastTransitionTime: "2024-05-16T10:28:37Z"
+        reason: MinimumReplicasAvailable
+        status: "True"
+        type: Available
+      event-exporter:
+        lastTransitionTime: "2024-05-16T10:28:39Z"
+        reason: MinimumReplicasAvailable
+        status: "True"
+        type: Available
+
