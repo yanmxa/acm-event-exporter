@@ -1,0 +1,42 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: event-exporter-kafka-user
+  namespace: multicluster-global-hub
+  labels:
+    strimzi.io/cluster: kafka
+spec:
+  authentication:
+    type: tls
+  authorization:
+    acls:
+    - host: '*'
+      operations:
+      - Describe
+      - Read
+      resource:
+        name: spec
+        patternType: literal
+        type: topic
+    - host: '*'
+      operations:
+      - Read
+      resource:
+        name: '*'
+        patternType: literal
+        type: group
+    - host: '*'
+      operations:
+      - Write
+      resource:
+        name: event
+        patternType: literal
+        type: topic
+    - host: '*'
+      operations:
+      - Write
+      resource:
+        name: status
+        patternType: prefix
+        type: topic
+    type: simple

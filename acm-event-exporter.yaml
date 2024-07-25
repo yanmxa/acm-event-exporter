@@ -1,0 +1,358 @@
+apiVersion: policy.open-cluster-management.io/v1
+kind: Policy
+metadata:
+  name: acm-event-exporter
+  namespace: open-cluster-management
+  annotations:
+    policy.open-cluster-management.io/standards: NIST 800-53
+    policy.open-cluster-management.io/categories: CM Configuration Management
+    policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
+spec:
+  remediationAction: inform
+  disabled: false
+  dependencies:
+  - apiVersion: policy.open-cluster-management.io/v1
+    compliance: Compliant
+    kind: Policy
+    name: acm-event-exporter-config
+  policy-templates:
+    - objectDefinition:
+        apiVersion: policy.open-cluster-management.io/v1
+        kind: ConfigurationPolicy
+        metadata:
+          name: policy-event-exporter-deployment
+        spec:
+          remediationAction: inform
+          severity: low
+          object-templates-raw: |
+            {{- /* Specify the parameters  */ -}}
+            {{- $ns := "open-cluster-management" }}  
+            {{- $exporter_name := "event-exporter" }} 
+            {{- $exporter_image := "quay.io/myan/multicluster-global-hub-agent:standalone" }} 
+            {{- $exporter_secret := "acm-event-exporter-secret" }} 
+            {{- $cluster_role := "open-cluster-management:event-exporter" }} 
+            {{- $cluster_role_binding := "open-cluster-management:event-exporter" }} 
+            {{- $cluster_role := "open-cluster-management:event-exporter" }} 
+            {{- $service_account := "event-exporter-sa" }} 
+
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  name: {{ $exporter_name }}
+                  namespace: {{ $ns }}
+                spec:
+                  replicas: 1
+                  selector:
+                    matchLabels:
+                      name: {{ $exporter_name }}
+                  template:
+                    metadata:
+                      labels:
+                        name: {{ $exporter_name }}
+                    spec:
+                      serviceAccountName: {{ $service_account }}
+                      containers:
+                      - args:
+                        - --zap-log-level=info
+                        - --pod-namespace=$(POD_NAMESPACE)
+                        - --leaf-hub-name={{ $exporter_name }}
+                        - --kafka-consumer-id={{ $exporter_name }}
+                        - --enforce-hoh-rbac=false
+                        - --transport-type=kafka
+                        - --kafka-bootstrap-server=$(BOOTSTRAP_SEVER)
+                        - --kafka-ca-cert-path=/event-exporter-certs/ca.crt
+                        - --kafka-client-cert-path=/event-exporter-certs/client.crt
+                        - --kafka-client-key-path=/event-exporter-certs/client.key
+                        - --kafka-consumer-topic=spec
+                        - --kafka-producer-topic=status.managed-hub
+                        - --kafka-event-topic=$(EVENT_TOPIC)
+                        - --transport-message-compression-type=gzip
+                        - --lease-duration=137
+                        - --renew-deadline=107
+                        - --retry-period=26
+                        - --enable-global-resource=false
+                        - --qps=150
+                        - --burst=300
+                        - --enable-pprof=false
+                        - --standalone=true
+                        env:
+                        - name: BOOTSTRAP_SEVER
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ $exporter_secret }}
+                              key: bootstrap.server
+                        - name: EVENT_TOPIC
+                          valueFrom:
+                            secretKeyRef:
+                              name: {{ $exporter_secret }}
+                              key: event.topic
+                        - name: POD_NAMESPACE
+                          valueFrom:
+                            fieldRef:
+                              apiVersion: v1
+                              fieldPath: metadata.namespace
+                        - name: WATCH_NAMESPACE
+                          valueFrom:
+                            fieldRef:
+                              apiVersion: v1
+                              fieldPath: metadata.namespace
+                        image: {{ $exporter_image }}
+                        imagePullPolicy: Always
+                        name: {{ $exporter_name }}
+                        resources:
+                          limits:
+                            memory: 1200Mi
+                          requests:
+                            cpu: 10m
+                            memory: 200Mi
+                        volumeMounts:
+                        - mountPath: /event-exporter-certs
+                          name: event-exporter-certs
+                          readOnly: true
+                      restartPolicy: Always
+                      terminationGracePeriodSeconds: 30
+                      volumes:
+                      - name: event-exporter-certs
+                        secret:
+                          defaultMode: 420
+                          secretName: {{ $exporter_secret }}
+            - complianceType: musthave
+              objectDefinition:
+                apiVersion: v1
+                kind: ServiceAccount
+                metadata:
+                  name: {{ $service_account }} 
+                  namespace: {{ $ns }}
+            - complianceType: musthave
+              objectDefinition:
+                kind: ClusterRoleBinding
+                apiVersion: rbac.authorization.k8s.io/v1
+                metadata:
+                  name: {{ $cluster_role_binding }} 
+                subjects:
+                - kind: ServiceAccount
+                  name: {{ $service_account }}
+                  namespace: {{ $ns }}
+                roleRef:
+                  kind: ClusterRole
+                  name: {{ $cluster_role }}
+                  apiGroup: rbac.authorization.k8s.io
+            - complianceType: musthave
+              objectDefinition:
+                kind: ClusterRole
+                apiVersion: rbac.authorization.k8s.io/v1
+                metadata:
+                  name: {{ $cluster_role }}
+                rules:
+                - apiGroups:
+                  - "app.k8s.io"
+                  resources:
+                  - applications
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                  - deletecollection
+                - apiGroups:
+                  - "apps.open-cluster-management.io"
+                  resources:
+                  - channels
+                  - placementrules
+                  - subscriptionreports
+                  - subscriptions
+                  - subscriptionstatuses
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                  - deletecollection
+                - apiGroups:
+                  - "policy.open-cluster-management.io"
+                  resources:
+                  - placementbindings
+                  - policies
+                  - policyautomations
+                  - policysets
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                  - deletecollection
+                - apiGroups:
+                  - cluster.open-cluster-management.io
+                  resources:
+                  - placements
+                  - managedclustersets
+                  - managedclustersetbindings
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                  - deletecollection
+                - apiGroups:
+                  - cluster.open-cluster-management.io
+                  resources:
+                  - managedclustersets/join
+                  - managedclustersets/bind
+                  verbs:
+                  - create
+                  - delete
+                - apiGroups:
+                  - cluster.open-cluster-management.io
+                  resources:
+                  - managedclusters
+                  - managedclusters/finalizers
+                  - placementdecisions
+                  - placementdecisions/finalizers
+                  - placements
+                  - placements/finalizers
+                  verbs:
+                  - get
+                  - list
+                  - watch
+                  - update
+                - apiGroups:
+                  - ""
+                  resources:
+                  - namespaces
+                  - pods
+                  - configmaps
+                  - events
+                  - secrets
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                - apiGroups:
+                  - coordination.k8s.io
+                  resources:
+                  - leases
+                  verbs:
+                  - get
+                  - create
+                  - update
+                  - delete
+                - apiGroups:
+                  - ""
+                  resources:
+                  - users
+                  - groups
+                  - serviceaccounts
+                  verbs:
+                  - impersonate
+                - apiGroups:
+                  - "coordination.k8s.io"
+                  resources:
+                  - leases
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                - apiGroups:
+                  - rbac.authorization.k8s.io
+                  resources:
+                  - clusterrolebindings
+                  - clusterroles
+                  - rolebindings
+                  - roles
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                - apiGroups:
+                  - apiextensions.k8s.io
+                  resources:
+                  - customresourcedefinitions
+                  verbs:
+                  - list
+                  - watch
+                - apiGroups:
+                  - operator.open-cluster-management.io
+                  resources:
+                  - multiclusterhubs
+                  - clustermanagers
+                  verbs:
+                  - get
+                  - list
+                  - watch
+                - apiGroups:
+                  - cluster.open-cluster-management.io
+                  resources:
+                  - clusterclaims
+                  verbs:
+                  - create
+                  - delete
+                  - get
+                  - list
+                  - patch
+                  - update
+                  - watch
+                - apiGroups:
+                  - route.openshift.io
+                  resources:
+                  - routes
+                  verbs:
+                  - list
+                  - watch
+                  - get
+---
+apiVersion: policy.open-cluster-management.io/v1
+kind: PlacementBinding
+metadata:
+  name: acm-event-exporter-binding
+  namespace: open-cluster-management
+placementRef:
+  name: acm-event-exporter-placement
+  kind: Placement
+  apiGroup: cluster.open-cluster-management.io
+subjects:
+- name: acm-event-exporter
+  kind: Policy
+  apiGroup: policy.open-cluster-management.io
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: acm-event-exporter-placement 
+  namespace: open-cluster-management
+spec:
+  clusterSets:
+  - default
+  predicates:
+  - requiredClusterSelector:
+      labelSelector:
+        matchExpressions:
+          - key: name
+            operator: In 
+            values: 
+              - local-cluster

@@ -1,0 +1,11 @@
+apiVersion: policy.open-cluster-management.io/v1beta1
+kind: PolicySet
+metadata:
+  name: acm-event-exporter-policyset
+  namespace: open-cluster-management
+spec:
+  description:  Report the events or resources to a specific transport. 
+  policies:
+    - acm-event-exporter-config
+    - acm-event-exporter
+      

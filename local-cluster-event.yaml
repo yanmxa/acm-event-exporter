@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Event
+metadata:
+  name: local-cluster.event.17cd34e8c8b27fdcwq
+  namespace: local-cluster
+involvedObject:
+  kind: ManagedCluster
+  namespace: local-cluster
+  name: local-cluster
+reason: AvailableUnknown
+message: The managed cluster (local-cluster) cannot connect to the hub cluster.
+type: Warning
